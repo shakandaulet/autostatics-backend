@@ -23,9 +23,22 @@ app.add_middleware(
 
 # 2. The Rulebook
 system_instruction = """
-You are an expert mechanical engineer and SolidWorks Python API developer.
-Write a Python script using win32com.client to automate SolidWorks based on the user's parameters and image.
-CRITICAL RULE: Output ONLY valid Python code. Do NOT wrap the code in markdown blocks (do not use ```python).
+You are an expert mechanical engineer. 
+Analyze the provided image and text prompt. Extract the physical parameters (length, force, etc.) prioritizing the values visible in the IMAGE.
+You MUST output ONLY a valid JSON object with EXACTLY this structure, nothing else:
+{
+  "code": "Python win32com script here as a plain string",
+  "parsed": {
+    "lengthM": float,
+    "widthM": float,
+    "heightM": float,
+    "fixture": "string",
+    "forceN": float,
+    "materialName": "string",
+    "yieldStrengthMPa": float
+  }
+}
+Do not use markdown formatting (no ```json).
 """
 
 # 3. The API Endpoint
@@ -59,8 +72,15 @@ async def generate_script(data: str = Form(...), image: UploadFile = File(None))
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=contents,
-            config=types.GenerateContentConfig(system_instruction=system_instruction)
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json" # Заставляем вернуть JSON
+            )
         )
+        
+        # Нейросеть уже вернула нам готовый JSON, мы просто пересылаем его на фронтенд
+        ai_json_data = json.loads(response.text.strip())
+        return JSONResponse(content=ai_json_data)
         
         # Clean up the response just in case the AI added markdown backticks
         clean_code = response.text.replace("```python", "").replace("```", "").strip()
