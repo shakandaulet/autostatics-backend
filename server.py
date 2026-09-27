@@ -86,15 +86,22 @@ async def generate_script(data: str = Form(...), image: UploadFile = File(None))
         return JSONResponse(content=response_data)
 
     except Exception as e:
-        print(f"\n🚨 CRASH REPORT: {str(e)}\n")
+        error_msg = str(e)
+        print(f"\n🚨 CRASH REPORT: {error_msg}\n")
         
-        # --- CHANGE THIS LINE ---
-        # Build a JSON response even for errors so the frontend doesn't break
+        # Проверяем, это перегрузка Google (503) или другая ошибка
+        if "503" in error_msg or "UNAVAILABLE" in error_msg:
+            user_message = "# Сервер нейросети временно перегружен. Пожалуйста, подождите минуту и нажмите Generate снова."
+            status = 503
+        else:
+            user_message = f"# Произошла ошибка при генерации: {error_msg}"
+            status = 500
+            
         error_data = {
-            "code": f"# ERROR generating code: {str(e)}",
+            "code": user_message,
             "parsed": {} 
         }
-        return JSONResponse(content=error_data, status_code=500)
+        return JSONResponse(content=error_data, status_code=status)
 
 if __name__ == "__main__":
     import uvicorn
